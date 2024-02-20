@@ -74,6 +74,20 @@ class Robot:
         self.IN3.ChangeDutyCycle(0)
         self.IN4.ChangeDutyCycle(0)
 
+class SoundController:
+    def __init__(self):
+        # Adicione aqui os caminhos para os arquivos de áudio correspondentes
+        self.sounds = {
+            "reto": "path_to_reto_sound_file.wav",
+            "direita": "path_to_direita_sound_file.wav",
+            "esquerda": "path_to_esquerda_sound_file.wav",
+            "parar": "path_to_parar_sound_file.wav"
+        }
+
+    def play_sound(self, sound_type):
+        if sound_type in self.sounds:
+            os.system("aplay " + self.sounds[sound_type])
+
 class Photo_sensor:
     def __init__(self):
         GPIO.setup(6, GPIO.IN)  # sensor_1
@@ -117,6 +131,7 @@ us_sensor_1 = Ultrasonic_sensor(trig_pin=10, echo_pin=9)  # Exemplo de pinos par
 #us_sensor_2 = Ultrasonic_sensor(trig_pin=11, echo_pin=12)  # Exemplo de pinos para sensor ultrassônico 2
 #us_sensor_3 = Ultrasonic_sensor(trig_pin=13, echo_pin=14)  # Exemplo de pinos para sensor ultrassônico 3
 aruco_detector = ArucoDetector(camera_id=1) 
+sound_controller = SoundController()
 
 value_old = [0, 0, 0]
 time.sleep(1)
@@ -136,6 +151,7 @@ while True:
             if value[0] == value[2]:
                 robot.forward(80)
                 print("AGV真っ直ぐ")
+                sound_controller.play_sound("reto")
             elif value[0] == 0:
                 robot.left_spin(80)
                 print("AGV左へ曲がります")
