@@ -4,7 +4,8 @@
 #The sonar code used by us is based on codes from experiments and products developed internally at the company.
 #Thanks everyone yours contents was of great help.
 #
-
+import cv2
+import cv2.aruco as aruco
 import RPi.GPIO as GPIO
 from gpiozero import DistanceSensor
 import time
@@ -89,6 +90,25 @@ class Ultrasonic_sensor:
     def get_distance(self):
         return self.sensor.distance * 100  # convertendo de metros para centímetros
 
+class ArucoDetector:
+    def __init__(self, camera_id=0):
+        self.cap = cv2.VideoCapture(camera_id)
+        self.dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_100)
+
+    def detect(self):
+        ret, frame = self.cap.read()
+        if ret:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            aruco_params = aruco.DetectorParameters_create()
+            corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.dictionary, parameters=aruco_params)
+
+            if ids is not None:
+                for i, marker_id in enumerate(ids):
+                    print(f"Found ARUCO marker with ID {marker_id}")
+                return marker_id
+
+        return -1
+
 GPIO.cleanup()
 GPIO.setwarnings(False)
 robot = Robot()
@@ -96,15 +116,17 @@ sensor = Photo_sensor()
 us_sensor_1 = Ultrasonic_sensor(trig_pin=10, echo_pin=9)  # Exemplo de pinos para sensor ultrassônico 1
 #us_sensor_2 = Ultrasonic_sensor(trig_pin=11, echo_pin=12)  # Exemplo de pinos para sensor ultrassônico 2
 #us_sensor_3 = Ultrasonic_sensor(trig_pin=13, echo_pin=14)  # Exemplo de pinos para sensor ultrassônico 3
+aruco_detector = ArucoDetector(camera_id=1) 
+
 value_old = [0, 0, 0]
 time.sleep(1)
 
 while True:
-#    print("o codigo esta rodando")
     value = sensor.read_sensor()
-#    print("o codigo esta rodando 1.2")
     distance_1 = us_sensor_1.get_distance()
-#    print("o codigo esta rodando2")
+    found = aruco_detector.detect()
+    if found >0:
+        print ("arucoMark is:",found)
     if distance_1 < 100:
         robot.stop()
         print("AGV一時停止")
