@@ -1,9 +1,7 @@
-#下記のコードは、以下のページで見つかったコードを改変したものです。
-#https://hellobreak.net/raspberry-pi-pico-line-trace-sensor3/
-#ラズベリーパイ用のPythonプログラミング言語に変更して、ソナーセンサーに反応するアルゴリズムを追加しました。
-
 import RPi.GPIO as GPIO
+from gpiozero import DistanceSensor
 import time
+
 class Robot:
     def __init__(self):
         GPIO.setmode(GPIO.BCM)
@@ -79,68 +77,60 @@ class Photo_sensor:
 
 class Ultrasonic_sensor:
     def __init__(self, trig_pin, echo_pin):
-        self.trig_pin = trig_pin
-        self.echo_pin = echo_pin
-        GPIO.setup(trig_pin, GPIO.OUT)
-        GPIO.setup(echo_pin, GPIO.IN)
+        self.sensor = DistanceSensor(echo=echo_pin, trigger=trig_pin, max_distance=4)  # assumindo max_distance de 4 metros
 
     def get_distance(self):
-        GPIO.output(self.trig_pin, True)
-        time.sleep(0.00001)
-        GPIO.output(self.trig_pin, False)
+        return self.sensor.distance * 100  # convertendo de metros para centímetros
 
-        start_time = time.time()
-        stop_time = time.time()
-
-        while GPIO.input(self.echo_pin) == 0:
-            start_time = time.time()
-
-        while GPIO.input(self.echo_pin) == 1:
-            stop_time = time.time()
-
-        time_elapsed = stop_time - start_time
-        distance = (time_elapsed * 34300) / 2  # Speed of sound = 34300 cm/s
-        return distance
-
+GPIO.cleanup()
+GPIO.setwarnings(False)
 robot = Robot()
 sensor = Photo_sensor()
 us_sensor_1 = Ultrasonic_sensor(trig_pin=10, echo_pin=9)  # Exemplo de pinos para sensor ultrassônico 1
-us_sensor_2 = Ultrasonic_sensor(trig_pin=11, echo_pin=12)  # Exemplo de pinos para sensor ultrassônico 2
-us_sensor_3 = Ultrasonic_sensor(trig_pin=13, echo_pin=14)  # Exemplo de pinos para sensor ultrassônico 3
+#us_sensor_2 = Ultrasonic_sensor(trig_pin=11, echo_pin=12)  # Exemplo de pinos para sensor ultrassônico 2
+#us_sensor_3 = Ultrasonic_sensor(trig_pin=13, echo_pin=14)  # Exemplo de pinos para sensor ultrassônico 3
 value_old = [0, 0, 0]
 time.sleep(1)
 
 while True:
+#    print("o codigo esta rodando")
     value = sensor.read_sensor()
+#    print("o codigo esta rodando 1.2")
     distance_1 = us_sensor_1.get_distance()
-    distance_2 = us_sensor_2.get_distance()
-    distance_3 = us_sensor_3.get_distance()
-
-    if distance_1 < 100 or distance_2 < 100 or distance_3 < 100:
+#    print("o codigo esta rodando2")
+    if distance_1 < 100:
         robot.stop()
+        print("AGV一時停止")
     else:
         # Centro é preto
-        if value[1] == 1:
+        if value[1] == 0:
             if value[0] == value[2]:
                 robot.forward(80)
-            elif value[0] == 1:
+                print("AGV真っ直ぐ")
+            elif value[0] == 0:
                 robot.left_spin(80)
-            elif value[2] == 1:
+                print("AGV左へ曲がります")
+            elif value[2] == 0:
                 robot.right_spin(80)
-                
-        # Centro é branco
+                print("AG右へ曲がります")
+# Centro é branco
         else:
-            if value[0] == 1:
+            if value[0] == 0:
                 robot.left_spin(80)
-            elif value[2] == 1:
+                print("AGV左")
+            elif value[2] == 0:
                 robot.right_spin(80)
+                print("AGV右")
             else:
-                if value_old[0] == 1:
+                if value_old[0] == 0:
                     robot.left_spin(100)
+                    print("AGV左sleep")
                     time.sleep(0.2)
-                elif value_old[2] == 1:
+                elif value_old[2] == 0:
                     robot.right_spin(100)
+                    print("AGV右sleep")
                     time.sleep(0.2)
                 else:
                     robot.forward(80)
+                    print("AGVまっすぐ")
     value_old = value
