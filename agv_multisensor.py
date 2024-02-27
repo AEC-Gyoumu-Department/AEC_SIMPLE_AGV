@@ -4,11 +4,10 @@
 #The sonar code used by us is based on codes from experiments and products developed internally at the company.
 #Thanks everyone yours contents was of great help.
 #
-import cv2
-import cv2.aruco as aruco
 import RPi.GPIO as GPIO
-from gpiozero import DistanceSensor
+from gpiozero import DistanceSensor, LED
 import time
+import curses
 
 class Robot:
     def __init__(self):
@@ -17,56 +16,66 @@ class Robot:
         GPIO.setup(18, GPIO.OUT)  # IN2
         GPIO.setup(22, GPIO.OUT)  # IN3
         GPIO.setup(23, GPIO.OUT)  # IN4
-        self.IN1 = GPIO.PWM(17, 1000)
-        self.IN2 = GPIO.PWM(18, 1000)
-        self.IN3 = GPIO.PWM(22, 1000)
-        self.IN4 = GPIO.PWM(23, 1000)
+        self.IN1 = GPIO.PWM(17, 10000) #OUT1 Left_Motor Negative Pin
+        self.IN2 = GPIO.PWM(18, 10000) #OUT2 Left_Motor Positive Pin
+        self.IN3 = GPIO.PWM(22, 10000) #OUT3 Right_Motor Positive Pin
+        self.IN4 = GPIO.PWM(23, 10000) #OUT4 Right_Motor Negative Pin
         self.IN1.start(0)
         self.IN2.start(0)
         self.IN3.start(0)
         self.IN4.start(0)
 
-    def forward(self, v):
+    def Left_Motor_forward(self,v):
         self.IN1.ChangeDutyCycle(v)
         self.IN2.ChangeDutyCycle(0)
-        self.IN3.ChangeDutyCycle(v)
-        self.IN4.ChangeDutyCycle(0)
 
-    def right(self, v):
-        self.IN1.ChangeDutyCycle(v)
-        self.IN2.ChangeDutyCycle(v)
-        self.IN3.ChangeDutyCycle(v)
-        self.IN4.ChangeDutyCycle(0)
-
-    def left(self, v):
-        self.IN1.ChangeDutyCycle(v)
-        self.IN2.ChangeDutyCycle(0)
-        self.IN3.ChangeDutyCycle(v)
-        self.IN4.ChangeDutyCycle(v)
-
-    def right_spin(self, v):
+    def Left_Motor_back(self,v):
         self.IN1.ChangeDutyCycle(0)
         self.IN2.ChangeDutyCycle(v)
-        self.IN3.ChangeDutyCycle(v)
-        self.IN4.ChangeDutyCycle(0)
 
-    def left_spin(self, v):
-        self.IN1.ChangeDutyCycle(v)
-        self.IN2.ChangeDutyCycle(0)
-        self.IN3.ChangeDutyCycle(0)
-        self.IN4.ChangeDutyCycle(v)
-
-    def back(self, v):
-        self.IN1.ChangeDutyCycle(0)
-        self.IN2.ChangeDutyCycle(v)
-        self.IN3.ChangeDutyCycle(0)
-        self.IN4.ChangeDutyCycle(v)
-
-    def stop(self):
+    def Left_Motor_stop(self):
         self.IN1.ChangeDutyCycle(100)
         self.IN2.ChangeDutyCycle(100)
+
+    def Right_Motor_forward(self,v):
+        self.IN3.ChangeDutyCycle(v)
+        self.IN4.ChangeDutyCycle(0)
+
+    def Right_Motor_back(self,v):
+        self.IN3.ChangeDutyCycle(0)
+        self.IN4.ChangeDutyCycle(v)
+
+    def Right_Motor_stop(self):
         self.IN3.ChangeDutyCycle(100)
         self.IN4.ChangeDutyCycle(100)
+
+    def forward(self, v):
+        self.Left_Motor_forward(v)
+        self.Right_Motor_forward(v)
+
+    def back(self, v):
+        self.Left_Motor_back(v)
+        self.Right_Motor_back(v)
+
+    def turn_right(self, v):
+        self.Left_Motor_forward(v)
+        self.Right_Motor_forward(0)
+
+    def turn_left(self, v):
+        self.Left_Motor_forward(0)
+        self.Right_Motor_forward(v)
+
+    def right_spin(self, v):
+        self.Left_Motor_forward(v)
+        self.Right_Motor_back(v)
+
+    def left_spin(self, v):
+        self.Right_Motor_forward(v)
+        self.Left_Motor_back(v)
+
+    def stop(self):
+        self.Right_Motor_stop()
+        self.Left_Motor_stop()
 
     def release(self):
         self.IN1.ChangeDutyCycle(0)
@@ -74,19 +83,33 @@ class Robot:
         self.IN3.ChangeDutyCycle(0)
         self.IN4.ChangeDutyCycle(0)
 
-class SoundController:
-    def __init__(self):
-        # Adicione aqui os caminhos para os arquivos de áudio correspondentes
-        self.sounds = {
-            "reto": "path_to_reto_sound_file.wav",
-            "direita": "path_to_direita_sound_file.wav",
-            "esquerda": "path_to_esquerda_sound_file.wav",
-            "parar": "path_to_parar_sound_file.wav"
-        }
+class LEDController:
 
-    def play_sound(self, sound_type):
-        if sound_type in self.sounds:
-            os.system("aplay " + self.sounds[sound_type])
+    def __init__(self, green_pin, red_pin):
+        self.green_led = LED(green_pin)
+        self.red_led = LED(red_pin)
+        self.green_led.off()
+        self.red_led.off()
+        self.red_is_bliking = 0
+        self.green_is_blinking = 0
+
+    def green_on(self):
+        if self.green_is_blinking == 0:
+            self.green_led.blink(on_time=0.5, off_time=0.5)
+            self.green_is_blinking = 1
+
+    def green_off(self):
+        self.green_led.off()
+        self.green_is_blinking = 0
+
+    def red_on(self):
+        if self.red_is_bliking == 0:
+            self.red_led.blink(on_time=0.5, off_time=0.5)
+            self.red_is_blinking = 1
+    def red_off(self):
+        self.red_led.off()
+        self.red_is_blinking = 0
+
 
 class Photo_sensor:
     def __init__(self):
@@ -95,7 +118,11 @@ class Photo_sensor:
         GPIO.setup(8, GPIO.IN)  # sensor_3
 
     def read_sensor(self):
-        return [GPIO.input(6), GPIO.input(7), GPIO.input(8)]
+        sensor_dict = {}
+        sensor_dict["left_sensor"] = GPIO.input(8)
+        sensor_dict["center_sensor"] = GPIO.input(7)
+        sensor_dict["right_sensor"] = GPIO.input(6)
+        return sensor_dict
 
 class Ultrasonic_sensor:
     def __init__(self, trig_pin, echo_pin):
@@ -104,78 +131,77 @@ class Ultrasonic_sensor:
     def get_distance(self):
         return self.sensor.distance * 100  # convertendo de metros para centímetros
 
-class ArucoDetector:
-    def __init__(self, camera_id=0):
-        self.cap = cv2.VideoCapture(camera_id)
-        self.dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_100)
-
-    def detect(self):
-        ret, frame = self.cap.read()
-        if ret:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            aruco_params = aruco.DetectorParameters_create()
-            corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.dictionary, parameters=aruco_params)
-
-            if ids is not None:
-                for i, marker_id in enumerate(ids):
-                    print(f"Found ARUCO marker with ID {marker_id}")
-                return marker_id
-
-        return -1
-
 GPIO.cleanup()
 GPIO.setwarnings(False)
 robot = Robot()
-sensor = Photo_sensor()
+photosensor = Photo_sensor()
 us_sensor_1 = Ultrasonic_sensor(trig_pin=10, echo_pin=9)  # Exemplo de pinos para sensor ultrassônico 1
 #us_sensor_2 = Ultrasonic_sensor(trig_pin=11, echo_pin=12)  # Exemplo de pinos para sensor ultrassônico 2
 #us_sensor_3 = Ultrasonic_sensor(trig_pin=13, echo_pin=14)  # Exemplo de pinos para sensor ultrassônico 3
-aruco_detector = ArucoDetector(camera_id=1) 
-sound_controller = SoundController()
-
-value_old = [0, 0, 0]
+photosensor_value_old = {"left_sensor":0, "center_sensor":0, "right_sensor":0}
+led_controller = LEDController(green_pin=24, red_pin=25)
 time.sleep(1)
+# Configurações iniciais do curses
+stdscr = curses.initscr()
+curses.curs_set(0)  # Esconde o cursor
+stdscr.clear()       # Limpa a tela
 
 while True:
-    value = sensor.read_sensor()
+    stdscr.refresh()
+    photosensor_value = photosensor.read_sensor()
     distance_1 = us_sensor_1.get_distance()
-    found = aruco_detector.detect()
-    if found >0:
-        print ("arucoMark is:",found)
-    if distance_1 < 100:
+    if distance_1 < 50:
         robot.stop()
-        print("AGV一時停止")
+        stdscr.addstr(1, 0, "AGV一時停止")
+        led_controller.green_off()
+        led_controller.red_on()
     else:
-        # Centro é preto
-        if value[1] == 0:
-            if value[0] == value[2]:
+        led_controller.green_on()
+        led_controller.red_off()
+        # Center is Black
+        if photosensor_value["center_sensor"] == 1:
+            stdscr.addstr(0, 0, "Center is BLACK")
+            if photosensor_value["left_sensor"] == photosensor_value["right_sensor"]:
                 robot.forward(80)
-                print("AGV真っ直ぐ")
-                sound_controller.play_sound("reto")
-            elif value[0] == 0:
-                robot.left_spin(80)
-                print("AGV左へ曲がります")
-            elif value[2] == 0:
-                robot.right_spin(80)
-                print("AG右へ曲がります")
-# Centro é branco
+                stdscr.addstr(1, 0, "FULL SPEED")
+                stdscr.addstr(2, 0, "BLACK Go AHEAD               ")
+            elif photosensor_value["left_sensor"] == 1:
+                robot.turn_left(90)
+                stdscr.addstr(1, 0, "FULL SPEED")
+                stdscr.addstr(2, 0,"BLACK Turning LEFT           ")
+                time.sleep(0.1)
+            elif  photosensor_value["right_sensor"] == 1:
+                robot.turn_right(90)
+                stdscr.addstr(1, 0, "FULL SPEED")
+                stdscr.addstr(2, 0,"BLACK Turning RIGHT          ")
+                time.sleep(0.1)
+    # Center Is White
         else:
-            if value[0] == 0:
-                robot.left_spin(80)
-                print("AGV左")
-            elif value[2] == 0:
-                robot.right_spin(80)
-                print("AGV右")
+            stdscr.addstr(0, 0, "CENTER IS WHITE")
+            if photosensor_value["left_sensor"] == 1:
+                robot.turn_left(90)
+                stdscr.addstr(1, 0, "FULL SPEED")
+                stdscr.addstr(2, 0,"WHITE Turning LEFT           ")
+                time.sleep(0.1)
+            elif photosensor_value["right_sensor"] == 1:
+                robot.turn_right(90)
+                stdscr.addstr(1, 0, "FULL SPEED")
+                stdscr.addstr(2, 0,"WHITE Turning RIGHT          ")
+                time.sleep(0.1)
             else:
-                if value_old[0] == 0:
-                    robot.left_spin(100)
-                    print("AGV左sleep")
-                    time.sleep(0.2)
-                elif value_old[2] == 0:
-                    robot.right_spin(100)
-                    print("AGV右sleep")
-                    time.sleep(0.2)
+                if photosensor_value_old["left_sensor"] == 1:
+                    robot.left_spin(90)
+                    stdscr.addstr(1, 0, "FULL SPEED")
+                    stdscr.addstr(2, 0,"LOST Spinning Left       ")
+                    time.sleep(0.1)
+                elif photosensor_value_old["right_sensor"] == 1:
+                    robot.right_spin(90)
+                    stdscr.addstr(1, 0, "FULL SPEED")
+                    stdscr.addstr(2, 0,"LOST Spinning Right      ")
+                    time.sleep(0.1)
                 else:
                     robot.forward(80)
-                    print("AGVまっすぐ")
-    value_old = value
+                    stdscr.addstr(1, 0, "SLOW SPEED")
+                    stdscr.addstr(2, 0,"LOST slowlyng go ahead")
+    photosensor_value_old = photosensor_value
+    time.sleep(0.001)
