@@ -2,7 +2,7 @@
 #Posted by @KeiMameshiba
 #The aruco mark reference, (when it will be implemented) come form openCv for python Docs.
 #The sonar code used by us is based on codes from experiments and products developed internally at the company.
-#Thanks everyone yours contents was of great help.
+#Thanks everyone!! Yours contents was of great help.
 #
 import RPi.GPIO as GPIO
 from gpiozero import DistanceSensor, LED
